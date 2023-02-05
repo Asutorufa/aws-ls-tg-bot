@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -8,6 +10,7 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jinzhu/now"
@@ -22,6 +25,18 @@ type MetricData struct {
 	Sum       float64 `json:"sum"`
 	Timestamp string  `json:"timestamp"`
 	Unit      string  `json:"unit"`
+}
+
+var others map[string]float64
+
+func init() {
+	now := time.Now()
+
+	if now.Year() == 2023 && now.Month() == time.February {
+		others = map[string]float64{
+			"Ubuntu-1": 76091156340 + 1024*1024*1024,
+		}
+	}
 }
 
 func Network(instanceName string) string {
@@ -47,6 +62,14 @@ func Network(instanceName string) string {
 		all += out
 	}
 	buf.WriteByte('\n')
+
+	for k, v := range others {
+		buf.WriteString(k)
+		buf.WriteString(": ")
+		buf.WriteString(fmt.Sprint(ReducedUnit(v)))
+		all += v
+		buf.WriteByte('\n')
+	}
 
 	buf.WriteString("All: ")
 	buf.WriteString(fmt.Sprint(ReducedUnit(all)))
@@ -98,7 +121,7 @@ func main() {
 		log.Panic(err)
 	}
 
-	bot.Debug = true
+	// bot.Debug = true
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
@@ -113,6 +136,10 @@ func main() {
 		tgbotapi.BotCommand{
 			Command:     "user_id",
 			Description: "get current user id",
+		},
+		tgbotapi.BotCommand{
+			Command:     "shell",
+			Description: "exec a shell command",
 		},
 	))
 
@@ -137,6 +164,43 @@ func main() {
 			})
 
 			bot.Send(msg)
+
+		case "shell":
+			ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+			filds := strings.Fields(update.Message.CommandArguments())
+			if len(filds) == 0 {
+				continue
+			}
+
+			c := exec.CommandContext(ctx, filds[0], filds[1:]...)
+			var b bytes.Buffer
+			c.Stdout = &b
+			c.Stderr = &b
+			err = c.Start()
+
+			go func() {
+				if er := c.Wait(); er != nil {
+					errors.Join(err, er)
+				}
+				cancel()
+			}()
+			<-ctx.Done()
+
+			if c.Process != nil {
+				if er := c.Process.Kill(); er != nil {
+					errors.Join(err, er)
+				}
+			}
+
+			if err != nil {
+				b.WriteByte('\n')
+				b.WriteString(err.Error())
+			}
+
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, b.String())
+			msg.ReplyToMessageID = update.Message.MessageID
+			bot.Send(msg)
+
 		case "user_id":
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprint(update.Message.From.ID))
 			msg.ReplyToMessageID = update.Message.MessageID
