@@ -199,6 +199,10 @@ func main() {
 
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, b.String())
 			msg.ReplyToMessageID = update.Message.MessageID
+			msg.Entities = append(msg.Entities, tgbotapi.MessageEntity{
+				Type:   "pre",
+				Length: b.Len(),
+			})
 			bot.Send(msg)
 
 		case "user_id":
