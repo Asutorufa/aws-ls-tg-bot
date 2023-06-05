@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,38 +12,14 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/jinzhu/now"
 )
-
-type Metrics struct {
-	Name string       `json:"metricName"`
-	Data []MetricData `json:"metricData"`
-}
-
-type MetricData struct {
-	Sum       float64 `json:"sum"`
-	Timestamp string  `json:"timestamp"`
-	Unit      string  `json:"unit"`
-}
-
-var others map[string]float64
-
-func init() {
-	now := time.Now()
-
-	if now.Year() == 2023 && now.Month() == time.February {
-		others = map[string]float64{
-			"Ubuntu-1": 76091156340 + 1024*1024*1024,
-		}
-	}
-}
 
 func Network(instanceName string) string {
 	var all float64
 	buf := strings.Builder{}
 
 	buf.WriteString("NetworkIn: ")
-	in, err := network("NetworkIn", instanceName)
+	in, err := AWS("NetworkIn", instanceName)
 	if err != nil {
 		buf.WriteString(err.Error())
 	} else {
@@ -54,7 +29,7 @@ func Network(instanceName string) string {
 	buf.WriteByte('\n')
 
 	buf.WriteString("NetworkOut: ")
-	out, err := network("NetworkOut", instanceName)
+	out, err := AWS("NetworkOut", instanceName)
 	if err != nil {
 		buf.WriteString(err.Error())
 	} else {
@@ -77,35 +52,6 @@ func Network(instanceName string) string {
 	return buf.String()
 }
 
-func network(metricName, instanceName string) (float64, error) {
-	cmd := exec.Command(
-		"aws",
-		"lightsail",
-		"get-instance-metric-data",
-		"--instance-name", instanceName,
-		"--metric-name", metricName,
-		"--period", "2700000",
-		"--start-time", fmt.Sprint(now.BeginningOfMonth().Unix()),
-		"--end-time", fmt.Sprint(now.EndOfMonth().Unix()),
-		"--unit", "Bytes",
-		"--statistics", "Sum",
-	)
-	networkBytes, err := cmd.Output()
-	if err != nil {
-		return 0, err
-	}
-
-	var Network Metrics
-	if err = json.Unmarshal(networkBytes, &Network); err != nil {
-		return 0, err
-	}
-
-	if len(Network.Data) == 0 {
-		return 0, errors.New("empty metics data")
-	}
-
-	return Network.Data[0].Sum, nil
-}
 func main() {
 	token := flag.String("t", "", "-t xxx, telegram bot token")
 	instanceName := flag.String("i", "", "-i xxx, aws lightsail instance name")
