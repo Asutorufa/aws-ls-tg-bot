@@ -1,0 +1,23 @@
+[package]
+name = "awstgbot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aws-config = "0.55.3"
+aws-sdk-lightsail = "0.28.0"
+aws-smithy-types = "0.55.3"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4.26", default-features = true }
+teloxide = { version = "0.12", features = ["macros"] }
+tokio-util = "0.7.8"
+futures = "0.3.28"
+
+[profile.release]
+lto = true
+opt-level = "z"
+codegen-units = 1   # Reduce number of codegen units to increase optimizations.
+panic = 'abort'     # Abort on panic
+strip = true        # Strip symbols from binary*
