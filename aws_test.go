@@ -1,7 +1,17 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/service/lightsail/types"
+)
 
 func TestAws(t *testing.T) {
-	t.Log(AWS("NetworkIn", ""))
+	al, err := NewAwsLs(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(al.Network(context.Background(), types.InstanceMetricNameNetworkIn, ""))
 }

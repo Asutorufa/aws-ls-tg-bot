@@ -1,24 +1,33 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/lightsail"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+
+	"github.com/aws/aws-sdk-go-v2/service/lightsail"
+	"github.com/aws/aws-sdk-go-v2/service/lightsail/types"
 	"github.com/jinzhu/now"
 )
 
-func AWS(metricName, instanceName string) (float64, error) {
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(endpoints.ApNortheast1RegionID),
-	}))
+type AwsLs struct {
+	client *lightsail.Client
+}
 
-	svc := lightsail.New(sess, &aws.Config{
-		Region: aws.String(endpoints.ApNortheast1RegionID),
-	})
+func NewAwsLs(ctx context.Context) (*AwsLs, error) {
+	config, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
 
+	return &AwsLs{
+		client: lightsail.NewFromConfig(config),
+	}, nil
+}
+
+func (a *AwsLs) Network(ctx context.Context, metricName types.InstanceMetricName, instanceName string) (float64, error) {
 	/*
 
 		"--period", "2700000",
@@ -27,15 +36,17 @@ func AWS(metricName, instanceName string) (float64, error) {
 		"--unit", "Bytes",
 		"--statistics", "Sum",
 	*/
-	data, err := svc.GetInstanceMetricData(&lightsail.GetInstanceMetricDataInput{
-		MetricName:   &metricName,
-		InstanceName: &instanceName,
-		StartTime:    aws.Time(now.BeginningOfMonth()),
-		EndTime:      aws.Time(now.EndOfMonth()),
-		Unit:         aws.String("Bytes"),
-		Statistics:   aws.StringSlice([]string{"Sum"}),
-		Period:       aws.Int64(2700000),
-	})
+	data, err := a.client.GetInstanceMetricData(ctx,
+		&lightsail.GetInstanceMetricDataInput{
+			MetricName:   metricName,
+			InstanceName: &instanceName,
+			StartTime:    aws.Time(now.BeginningOfMonth()),
+			EndTime:      aws.Time(now.EndOfMonth()),
+			Unit:         types.MetricUnitBytes,
+			Statistics:   []types.MetricStatistic{types.MetricStatisticSum},
+			Period:       2700000,
+		},
+	)
 	if err != nil {
 		return 0, err
 	}

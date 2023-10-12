@@ -11,15 +11,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/lightsail/types"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func Network(instanceName string) string {
+func (a *AwsLs) NetworkFormat(ctx context.Context, instanceName string) string {
 	var all float64
 	buf := strings.Builder{}
 
 	buf.WriteString("NetworkIn: ")
-	in, err := AWS("NetworkIn", instanceName)
+	in, err := a.Network(ctx, types.InstanceMetricNameNetworkIn, instanceName)
 	if err != nil {
 		buf.WriteString(err.Error())
 	} else {
@@ -29,7 +30,7 @@ func Network(instanceName string) string {
 	buf.WriteByte('\n')
 
 	buf.WriteString("NetworkOut: ")
-	out, err := AWS("NetworkOut", instanceName)
+	out, err := a.Network(ctx, types.InstanceMetricNameNetworkOut, instanceName)
 	if err != nil {
 		buf.WriteString(err.Error())
 	} else {
@@ -71,10 +72,15 @@ func main() {
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
+	awsLs, err := NewAwsLs(context.Background())
+	if err != nil {
+		log.Panic(err)
+	}
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
-	bot.Request(tgbotapi.NewSetMyCommands(
+	bot.Request(tgbotapi.NewSetMyCommands( // nolint:errcheck
 		tgbotapi.BotCommand{
 			Command:     "network",
 			Description: "network in/out all",
@@ -101,7 +107,7 @@ func main() {
 
 		switch update.Message.Command() {
 		case "network":
-			str := Network(*instanceName)
+			str := awsLs.NetworkFormat(context.Background(), *instanceName)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, str)
 			msg.ReplyToMessageID = update.Message.MessageID
 			msg.Entities = append(msg.Entities, tgbotapi.MessageEntity{
@@ -109,7 +115,9 @@ func main() {
 				Length: len(str),
 			})
 
-			bot.Send(msg)
+			if _, err := bot.Send(msg); err != nil {
+				log.Println(err)
+			}
 
 		case "shell":
 			ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
@@ -122,19 +130,12 @@ func main() {
 			var b bytes.Buffer
 			c.Stdout = &b
 			c.Stderr = &b
-			err = c.Start()
-
-			go func() {
-				if er := c.Wait(); er != nil {
-					errors.Join(err, er)
-				}
-				cancel()
-			}()
-			<-ctx.Done()
+			err = c.Run()
+			cancel()
 
 			if c.Process != nil {
 				if er := c.Process.Kill(); er != nil {
-					errors.Join(err, er)
+					err = errors.Join(err, er)
 				}
 			}
 
@@ -145,16 +146,17 @@ func main() {
 
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, b.String())
 			msg.ReplyToMessageID = update.Message.MessageID
-			msg.Entities = append(msg.Entities, tgbotapi.MessageEntity{
-				Type:   "pre",
-				Length: b.Len(),
-			})
-			bot.Send(msg)
+			msg.Entities = append(msg.Entities, tgbotapi.MessageEntity{Type: "pre", Length: b.Len()})
+			if _, err := bot.Send(msg); err != nil {
+				log.Println(err)
+			}
 
 		case "user_id":
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprint(update.Message.From.ID))
 			msg.ReplyToMessageID = update.Message.MessageID
-			bot.Send(msg)
+			if _, err := bot.Send(msg); err != nil {
+				log.Println(err)
+			}
 
 		default:
 			continue
