@@ -138,6 +138,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-cloudwatch"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7263a92103fcd82ad1cb882274ece03a84a1041d08a487bb3d783c60acdf8f49"
+dependencies = [
+ "aws-credential-types",
+ "aws-endpoint",
+ "aws-http",
+ "aws-sig-auth",
+ "aws-smithy-async",
+ "aws-smithy-client",
+ "aws-smithy-http",
+ "aws-smithy-http-tower",
+ "aws-smithy-json",
+ "aws-smithy-query",
+ "aws-smithy-types",
+ "aws-smithy-xml",
+ "aws-types",
+ "bytes",
+ "http",
+ "regex",
+ "tokio-stream",
+ "tower",
+ "tracing",
+]
+
+[[package]]
 name = "aws-sdk-lightsail"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -381,8 +408,10 @@ name = "awstgbot"
 version = "0.1.0"
 dependencies = [
  "aws-config",
+ "aws-sdk-cloudwatch",
  "aws-sdk-lightsail",
  "aws-smithy-types",
+ "aws-types",
  "chrono",
  "futures",
  "teloxide",
