@@ -1,3 +1,4 @@
+use aws_config::BehaviorVersion;
 use aws_sdk_lightsail::Client;
 use chrono::{DateTime, Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime};
 
@@ -9,7 +10,7 @@ pub struct AwsClient {
 
 impl AwsClient {
     pub async fn new(instance: String) -> Self {
-        let shared_config = aws_config::load_from_env().await;
+        let shared_config = aws_config::load_defaults(BehaviorVersion::latest()).await;
 
         println!(
             "token: {:#?}, region: {:#?}",
@@ -105,7 +106,7 @@ impl AwsClient {
             ));
 
         let resp = req.send().await?;
-        let metric_data = match resp.metric_data() {
+        let metric_data = match resp.metric_data {
             None => return Err("get metric data failed".into()),
             Some(v) => v,
         };
@@ -121,16 +122,16 @@ impl AwsClient {
 mod test {
 
     use super::AwsClient;
+    use aws_config::BehaviorVersion;
     use chrono::{DateTime, Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime};
 
     #[tokio::test]
     async fn get_cloudfront_data() {
-        let mut shared_config = aws_config::load_from_env().await;
+        let mut shared_config = aws_config::load_defaults(BehaviorVersion::latest()).await;
         shared_config = aws_config::SdkConfig::builder()
-            .http_connector((*shared_config.http_connector().unwrap()).clone())
+            .http_client(shared_config.http_client().unwrap())
             .region(aws_types::region::Region::new("us-east-1"))
-            .credentials_cache((*shared_config.credentials_cache().unwrap()).clone())
-            .credentials_provider((*shared_config.credentials_provider().unwrap()).clone())
+            .credentials_provider(shared_config.credentials_provider().unwrap())
             .build();
         let cloud_watch = aws_sdk_cloudwatch::client::Client::new(&shared_config);
 
@@ -193,17 +194,17 @@ mod test {
             Some(v) => v,
         };
 
-        let month;
-        if local.month() < 12 {
-            month = local.month() + 1;
-        } else {
-            month = 1;
-        }
+        // let month;
+        // if local.month() < 12 {
+        //     month = local.month() + 1;
+        // } else {
+        //     month = 1;
+        // }
 
-        let end_date = match NaiveDate::from_ymd_opt(local.year(), month, 1) {
-            None => panic!("None EndDate"),
-            Some(v) => v,
-        };
+        // let end_date = match NaiveDate::from_ymd_opt(local.year(), month, 1) {
+        //     None => panic!("None EndDate"),
+        //     Some(v) => v,
+        // };
 
         let mrtrics = cloud_watch
             .get_metric_data()

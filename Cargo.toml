@@ -6,16 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aws-config = "0.55.3"
-aws-types = "0.55.3"
-aws-sdk-lightsail = "0.28.0"
-aws-sdk-cloudwatch = "0.28.0"
-aws-smithy-types = "0.55.3"
-tokio = { version = "1", features = ["full"] }
-chrono = { version = "0.4.26", default-features = true }
-teloxide = { version = "0.12", features = ["macros"] }
-tokio-util = "0.7.8"
-futures = "0.3.28"
+aws-config = "1.1.6"
+aws-types = "1.1.6"
+aws-sdk-lightsail = "1.16.0"
+aws-sdk-cloudwatch = "1.16.0"
+aws-smithy-types = "1.1.7"
+tokio = { version = "1.36.0", features = ["full"] }
+chrono = { version = "0.4.34", default-features = true }
+teloxide = { version = "0.12.2", features = ["macros"] }
+tokio-util = "0.7.10"
+futures = "0.3.30"
 
 [profile.release]
 lto = true

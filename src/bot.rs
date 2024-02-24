@@ -128,17 +128,19 @@ async fn answer(
                 Err(e) => e.to_string(),
                 Ok(v) => v,
             };
-            let text_len = text.len();
+
+            println!("command: {}, args: {:?}", process, args,);
+
+            // let text_len = text.len();
 
             bot.send_message(msg.chat.id, text)
                 .reply_to_message_id(msg.id)
-                .entities(vec![teloxide::types::MessageEntity {
-                    kind: teloxide::types::MessageEntityKind::Pre {
-                        language: Some("shell".to_string()),
-                    },
-                    offset: 0,
-                    length: text_len,
-                }])
+                // .parse_mode(ParseMode::Html)
+                // .entities(vec![teloxide::types::MessageEntity {
+                //     kind: teloxide::types::MessageEntityKind::Pre { language: None },
+                //     offset: 0,
+                //     length: text_len,
+                // }])
                 .await?
         }
         Command::UserID => {
