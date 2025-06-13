@@ -8,6 +8,7 @@ pub async fn run(command: &str, args: &[&str]) -> Result<String, Box<dyn std::er
         .kill_on_drop(true)
         .args(args)
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()?;
 
     let output = match child.stdout.take() {
@@ -18,7 +19,19 @@ pub async fn run(command: &str, args: &[&str]) -> Result<String, Box<dyn std::er
         Some(v) => v,
     };
 
-    let mut reader = FramedRead::new(output, LinesCodec::new());
+    let stderr = match child.stderr.take() {
+        None => {
+            child.kill().await.unwrap();
+            return Err("can't take child stderr".into());
+        }
+        Some(v) => v,
+    };
+
+    let reader = FramedRead::new(output, LinesCodec::new());
+
+    let stderr_reader = FramedRead::new(stderr, LinesCodec::new());
+
+    let mut combined = stream::select(reader, stderr_reader);
 
     let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
 
@@ -34,10 +47,12 @@ pub async fn run(command: &str, args: &[&str]) -> Result<String, Box<dyn std::er
     });
 
     let mut os = String::from("");
-    while let Some(line) = reader.next().await {
+
+    while let Some(line) = combined.next().await {
         os.push_str(line?.as_str());
         os.push_str("\n");
     }
+
     tx.send(true).unwrap_or_default();
     Ok(os)
 }

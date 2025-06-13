@@ -9,16 +9,17 @@ use teloxide::prelude::UserId;
 */
 #[tokio::main]
 async fn main() {
-    let instance = std::env::var("AWS_INSTANCE").unwrap();
     let maintainer_id = std::env::var("MAINTAINER_ID")
         .unwrap()
         .parse::<u64>()
         .unwrap();
 
-    let aws_client = AwsClient::new(instance).await;
-    run_bot(RunOpt {
+    let aws_client = AwsClient::new().await;
+    let mut dispatcher = run_bot(RunOpt {
         aws_client,
         maintainer: UserId(maintainer_id),
     })
     .await;
+
+    dispatcher.dispatch().await;
 }
