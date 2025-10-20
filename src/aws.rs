@@ -1,7 +1,7 @@
 use std::fmt;
 
 use aws_config::BehaviorVersion;
-use aws_sdk_lightsail::Client;
+use aws_sdk_lightsail::{types::Instance, Client};
 use aws_smithy_types::body::SdkBody;
 use chrono::{DateTime, Datelike, Local, NaiveDate, NaiveDateTime, NaiveTime};
 
@@ -184,6 +184,37 @@ impl AwsClient {
             None => Err("sum is none".into()),
             Some(v) => Ok(v),
         };
+    }
+
+    pub async fn get_instance_infos(self) -> Result<Vec<Instance>, StringError> {
+        let instances = match self.client.get_instances().send().await {
+            Err(e) => {
+                return Err(StringError::from(
+                    self.raw_response_to_string(e.raw_response())?,
+                ));
+            }
+            Ok(v) => v,
+        };
+
+        Ok(instances.instances().to_vec())
+    }
+
+    pub async fn reboot_instance(self, instance_name: String) -> Result<(), StringError> {
+        let resp = self
+            .client
+            .reboot_instance()
+            .instance_name(instance_name)
+            .send()
+            .await;
+
+        match resp {
+            Err(e) => {
+                return Err(StringError::from(
+                    self.raw_response_to_string(e.raw_response())?,
+                ));
+            }
+            Ok(_) => Ok(()),
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::aws::AwsClient;
 use crate::command::run;
 use teloxide::{
-    dispatching::DefaultKey,
+    dispatching::{DefaultKey, DpHandlerDescription},
     prelude::*,
     types::{ReplyParameters, Update, UserId},
     utils::{command::BotCommands, markdown},
@@ -16,6 +16,8 @@ use teloxide::{
 pub enum Command {
     #[command(description = "get network flow")]
     Network,
+    #[command(description = "get instance infos")]
+    Info,
     #[command(description = "run a shell command in 5 seconds")]
     Shell(String),
     #[command(description = "get current user id")]
@@ -28,6 +30,18 @@ pub struct RunOpt {
     pub maintainer: UserId,
 }
 
+pub fn handler() -> Handler<'static, Result<(), RequestError>, DpHandlerDescription> {
+    dptree::entry()
+        .branch(
+            Update::filter_message()
+                .branch(dptree::entry().filter_command::<Command>().endpoint(answer)),
+        )
+        .branch(
+            Update::filter_edited_message()
+                .branch(dptree::entry().filter_command::<Command>().endpoint(answer)),
+        )
+}
+
 pub async fn run_bot(run_opt: RunOpt) -> Dispatcher<Bot, RequestError, DefaultKey> {
     let bot = Bot::from_env();
 
@@ -36,15 +50,7 @@ pub async fn run_bot(run_opt: RunOpt) -> Dispatcher<Bot, RequestError, DefaultKe
         .await
         .unwrap();
 
-    let handler = dptree::entry()
-        .branch(
-            Update::filter_message()
-                .branch(dptree::entry().filter_command::<Command>().endpoint(answer)),
-        )
-        .branch(
-            Update::filter_edited_message()
-                .branch(dptree::entry().filter_command::<Command>().endpoint(answer)),
-        );
+    let handler = handler();
 
     let deps = dptree::deps![run_opt];
 
@@ -128,7 +134,11 @@ pub async fn answer(
 
                         text.push_str(
                             format!(
-                                "{}\n```\n{}\n```",
+                                r#"
+{}
+```{}```
+
+"#,
                                 markdown::escape(instance.as_str()),
                                 markdown::escape(flow_message(network_out, network_in).as_str())
                             )
@@ -137,6 +147,73 @@ pub async fn answer(
                     }
                 }
             };
+
+            bot.send_message(msg.chat.id, text)
+                .reply_parameters(ReplyParameters::new(msg.id))
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .await?;
+            return Ok(());
+        }
+
+        Command::Info => {
+            if from_user != opt.maintainer {
+                return Ok(());
+            }
+
+            let mut text: String = String::new();
+            match opt.aws_client.get_instance_infos().await {
+                Err(e) => text.push_str(markdown::escape(e.to_string().as_str()).as_str()),
+                Ok(infos) => {
+                    for info in infos {
+                        text.push_str(
+                            format!(
+                                r#"
+{} {}
+{}{}
+```
+Private IP: {}
+Location: {}
+State: {}
+Image: {}({})
+Bound: {}
+```
+"#,
+                                markdown::escape(info.name().unwrap_or_default()),
+                                match info.state() {
+                                    Some(v) if v.name().unwrap_or_default() == "running" => "🟢",
+                                    _ => "🔴",
+                                },
+                                match info.public_ip_address() {
+                                    None => "".to_string(),
+                                    Some(v) => format!("||{}||\n", markdown::escape(v)),
+                                },
+                                info.ipv6_addresses()
+                                    .iter()
+                                    .map(|v| -> String { format!("||{}||", markdown::escape(v)) })
+                                    .collect::<Vec<String>>()
+                                    .join("\n")
+                                    .as_str(),
+                                markdown::escape(info.private_ip_address().unwrap_or_default()),
+                                markdown::escape(match info.location() {
+                                    None => "",
+                                    Some(v) => match v.region_name() {
+                                        None => "",
+                                        Some(v) => v.as_str(),
+                                    },
+                                }),
+                                markdown::escape(match info.state() {
+                                    None => "",
+                                    Some(v) => v.name().unwrap_or_default(),
+                                }),
+                                markdown::escape(info.blueprint_name().unwrap_or_default()),
+                                markdown::escape(info.blueprint_id().unwrap_or_default()),
+                                markdown::escape(info.bundle_id().unwrap_or_default()),
+                            )
+                            .as_str(),
+                        );
+                    }
+                }
+            }
 
             bot.send_message(msg.chat.id, text)
                 .reply_parameters(ReplyParameters::new(msg.id))

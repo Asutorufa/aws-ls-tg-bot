@@ -1,7 +1,7 @@
 use aws_lambda_events::lambda_function_urls::LambdaFunctionUrlRequest;
 use awstgbot::{
     aws::AwsClient,
-    bot::{answer, Command, RunOpt},
+    bot::{handler, Command, RunOpt},
 };
 use teloxide::{
     dptree::{self},
@@ -83,15 +83,7 @@ impl LambdaHandler {
 
         let update: Update = serde_json::from_slice(&body)?;
 
-        let handler = dptree::entry()
-            .branch(
-                Update::filter_message()
-                    .branch(dptree::entry().filter_command::<Command>().endpoint(answer)),
-            )
-            .branch(
-                Update::filter_edited_message()
-                    .branch(dptree::entry().filter_command::<Command>().endpoint(answer)),
-            );
+        let handler = handler();
 
         let dependencies = dptree::deps![
             self.me.clone(),
